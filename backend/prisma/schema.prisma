@@ -1,0 +1,81 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  password     String
+  name         String
+  role         String    @default("user")
+  gender       String?
+  phone        String?
+  dob          DateTime?
+  profilePhoto String?
+  image        String?
+  idProofType  String?
+  idProofUrl   String?
+  createdAt    DateTime  @default(now())
+
+  // relations
+  expenses Expense[]
+  zones    UserZone[]
+
+  categories Category[]
+}
+
+model Zone {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  createdBy String?
+
+  users    UserZone[]
+  expenses Expense[]
+}
+
+model UserZone {
+  id        String   @id @default(uuid())
+  userId    String
+  zoneId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  zone Zone @relation(fields: [zoneId], references: [id])
+
+  @@unique([userId, zoneId])
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  createdBy String?
+  creator   User?   @relation(fields: [createdBy], references: [id])
+
+  expenses Expense[]
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  amount      Float
+  description String?
+  expenseDate DateTime
+  receiptUrl  String?
+  createdAt   DateTime @default(now())
+
+  userId     String
+  categoryId String
+  zoneId     String
+
+  user     User     @relation(fields: [userId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+  zone     Zone     @relation(fields: [zoneId], references: [id])
+}
