@@ -7,24 +7,45 @@ import { v2 as cloudinary } from "cloudinary"
 export const getAllUsers = async (_req: AuthRequest, res: Response) => {
   try {
     const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true
-      },
       orderBy: {
         createdAt: "desc"
+      },
+      include: {
+        zones: {
+          include: {
+            zone: true
+          }
+        }
       }
     })
 
-    res.json(users)
+    const formattedUsers = users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+
+      // Match frontend field names
+      dob: u.dob || null,
+      created_at: u.createdAt,
+
+      profile_photo_url: u.image || null,
+
+      // Join zone names into comma string
+      zone_names: u.zones
+        .map((uz) => uz.zone.name)
+        .join(","),
+
+    }))
+
+    res.json(formattedUsers)
+
   } catch (error) {
     console.error("GET USERS ERROR:", error)
     res.status(500).json({ message: "Server error" })
   }
 }
+
 
 export const updateUserRole = async (req: AuthRequest, res: Response) => {
   try {
@@ -173,21 +194,47 @@ export const createUser = async (req: AuthRequest, res: Response) => {
 export const updateUser = async (req: AuthRequest, res: Response) => {
   try {
     const id = req.params.id as string
-    const { name, role } = req.body
+
+    const {
+      name,
+      email,
+      dob,
+      id_proof_type,
+      role,
+      status
+    } = req.body
+
+    let imageUrl: string | undefined
+
+    if (req.file) {
+      // if using cloudinary or local upload
+      imageUrl = `/uploads/${req.file.filename}` // adjust if using cloudinary
+    }
 
     const updatedUser = await prisma.user.update({
+      
       where: { id },
       data: {
         name,
-        role
+        email,
+        dob: dob ? new Date(dob) : null,
+        idProofType: id_proof_type,
+        role,
+        image: imageUrl,
+        
       }
     })
 
     res.json(updatedUser)
+    console.log("Updated user:", updatedUser)
+
+
   } catch (error) {
+    console.error("UPDATE USER ERROR:", error)
     res.status(500).json({ message: "Failed to update user" })
   }
 }
+
 export const getUserExpenseTotals = async (req: AuthRequest, res: Response) => {
   try {
     const totals = await prisma.expense.groupBy({
@@ -231,3 +278,96 @@ export const getZoneExpenseTotals = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const resetUserPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string
+    const { newPassword } = req.body
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters"
+      })
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+    await prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword }
+    })
+
+    res.json({ message: "Password reset successfully" })
+
+  } catch (error) {
+    console.error("RESET PASSWORD ERROR:", error)
+    res.status(500).json({ message: "Failed to reset password" })
+  }
+}
+
+export const toggleUserZone = async (req: AuthRequest, res: Response) => {
+
+  try {
+    const { userId, zoneId } = req.body
+
+    if (!userId || !zoneId) {
+      return res.status(400).json({ message: "Missing userId or zoneId" })
+    }
+
+    const existing = await prisma.userZone.findUnique({
+      where: {
+        userId_zoneId: {
+          userId,
+          zoneId
+        }
+      }
+    })
+
+    if (existing) {
+      // Remove zone
+      await prisma.userZone.delete({
+        where: {
+          userId_zoneId: {
+            userId,
+            zoneId
+          }
+        }
+      })
+
+      return res.json({ message: "Zone removed from user" })
+    }
+
+    // Assign zone
+    await prisma.userZone.create({
+      data: {
+        userId,
+        zoneId
+      }
+    })
+
+    res.json({ message: "Zone assigned to user" })
+
+  } catch (error) {
+    console.error("TOGGLE USER ZONE ERROR:", error)
+    res.status(500).json({ message: "Failed to toggle zone" })
+  }
+}
+export const getUserZones = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.params.userId as string
+
+    const zones = await prisma.userZone.findMany({
+      where: { userId },
+      select: {
+        zoneId: true
+      }
+    })
+
+    const zoneIds = zones.map(z => z.zoneId)
+
+    res.json(zoneIds)
+
+  } catch (error) {
+    console.error("GET USER ZONES ERROR:", error)
+    res.status(500).json({ message: "Failed to fetch user zones" })
+  }
+}

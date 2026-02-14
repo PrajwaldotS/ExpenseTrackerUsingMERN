@@ -27,7 +27,16 @@ export const createZone = async (req: AuthRequest, res: Response) => {
 export const getAllZones = async (_req: Request, res: Response) => {
   try {
     const zones = await prisma.zone.findMany({
-      orderBy: { createdAt: "desc" }
+     include: {
+    creator: {
+      select: {
+        name: true
+      }
+    }
+  },
+  orderBy: {
+    createdAt: "desc"
+  }
     })
 
     res.json(zones)
@@ -72,3 +81,43 @@ export const getMyZones = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: "Server error" })
   }
 }
+export const deleteZone = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string
+
+    if (!id) {
+      return res.status(400).json({ message: "Zone ID required" })
+    }
+
+    // Optional: check if zone exists
+    const existingZone = await prisma.zone.findUnique({
+      where: { id }
+    })
+
+    if (!existingZone) {
+      return res.status(404).json({ message: "Zone not found" })
+    }
+
+    // Remove related userZone entries first (if relation exists)
+    await prisma.userZone.deleteMany({
+      where: { zoneId: id }
+    })
+
+    // Remove related expenses (if needed)
+    await prisma.expense.deleteMany({
+      where: { zoneId: id }
+    })
+
+    // Finally delete zone
+    await prisma.zone.delete({
+      where: { id }
+    })
+
+    res.json({ message: "Zone deleted successfully" })
+
+  } catch (error) {
+    console.error("DELETE ZONE ERROR:", error)
+    res.status(500).json({ message: "Failed to delete zone" })
+  }
+}
+

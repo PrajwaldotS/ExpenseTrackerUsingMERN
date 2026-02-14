@@ -31,29 +31,51 @@ export const createExpense = async (req: AuthRequest, res: Response) => {
 
 export const getMyExpenses = async (req: AuthRequest, res: Response) => {
   try {
-    const { zoneId, categoryId } = req.query
+    res.setHeader("Cache-Control", "no-store")
 
-    const expenses = await prisma.expense.findMany({
-      where: {
-        userId: req.user.id,
-        zoneId: zoneId as string | undefined,
-        categoryId: categoryId as string | undefined
-      },
-      include: {
-        category: true,
-        zone: true
-      },
-      orderBy: {
-        createdAt: "desc"
+    const { zoneId, categoryId, page = "1", pageSize = "10", search } = req.query
+
+    const pageNumber = Number(page)
+    const size = Number(pageSize)
+
+    const where: any = {
+      userId: req.user.id
+    }
+
+    if (zoneId) where.zoneId = zoneId
+    if (categoryId) where.categoryId = categoryId
+    if (search) {
+      where.description = {
+        contains: search as string,
+        mode: "insensitive"
       }
+    }
+
+    const [expenses, total] = await Promise.all([
+      prisma.expense.findMany({
+        where,
+        include: {
+          category: true,
+          zone: true
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (pageNumber - 1) * size,
+        take: size
+      }),
+      prisma.expense.count({ where })
+    ])
+
+    res.json({
+      data: expenses,
+      total
     })
 
-    res.json(expenses)
   } catch (error) {
     console.error("GET EXPENSES ERROR:", error)
     res.status(500).json({ message: "Server error" })
   }
 }
+
 
 export const deleteExpense = async (req: AuthRequest, res: Response) => {
   try {
@@ -110,7 +132,13 @@ export const uploadReceipt = async (
 
 export const updateExpense = async (req: AuthRequest, res: Response) => {
   try {
-    const  id  = req.params.id as string
+    const id = req.params.id as string
+    const userId = req.user?.id
+
+    if (!id) {
+      return res.status(400).json({ message: "Expense ID missing" })
+    }
+
     const {
       amount,
       description,
@@ -119,19 +147,46 @@ export const updateExpense = async (req: AuthRequest, res: Response) => {
       expenseDate
     } = req.body
 
+    // 🔒 Ensure expense belongs to logged-in user (safety)
+    const existingExpense = await prisma.expense.findUnique({
+      where: { id }
+    })
+
+    if (!existingExpense) {
+      return res.status(404).json({ message: "Expense not found" })
+    }
+
+    if (existingExpense.userId !== userId) {
+      return res.status(403).json({ message: "Not authorized to update this expense" })
+    }
+
+    // ✅ Safe amount conversion
+    const parsedAmount = amount ? Number(amount) : undefined
+
+    // ✅ Safe date conversion
+    let parsedDate: Date | undefined = undefined
+    if (expenseDate && expenseDate !== "") {
+      const tempDate = new Date(expenseDate)
+      if (!isNaN(tempDate.getTime())) {
+        parsedDate = tempDate
+      }
+    }
+
     const updatedExpense = await prisma.expense.update({
       where: { id },
       data: {
-        amount,
-        description,
-        categoryId,
-        zoneId,
-        expenseDate
+        ...(parsedAmount !== undefined && { amount: parsedAmount }),
+        ...(description !== undefined && { description }),
+        ...(categoryId && categoryId !== "" && { categoryId }),
+        ...(zoneId && zoneId !== "" && { zoneId }),
+        ...(parsedDate && { expenseDate: parsedDate })
       }
     })
 
     res.json(updatedExpense)
+
   } catch (error) {
+    console.error("UPDATE EXPENSE ERROR:", error)
     res.status(500).json({ message: "Failed to update expense" })
   }
 }

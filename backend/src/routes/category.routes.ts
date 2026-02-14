@@ -30,7 +30,7 @@ router.get("/categories-summary", authMiddleware, requireAdmin, async (req, res)
   const result = categories.map(c => ({
     id: c.id,
     name: c.name,
-    created_by: c.creator?.name || "—",  // 👈 now returning NAME
+    created_by: c.creator?.name || "—",  
     created_at: c.createdAt,
     total_expense: c.expenses.reduce((sum, e) => sum + e.amount, 0)
   }))
