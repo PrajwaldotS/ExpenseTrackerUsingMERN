@@ -19,20 +19,20 @@ export const getAllUsers = async (_req: AuthRequest, res: Response) => {
       }
     })
 
-    const formattedUsers = users.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
+    const formattedUsers = users.map((uz) => ({
+      id: uz.id,
+      name: uz.name,
+      email: uz.email,
+      role: uz.role,
 
       // Match frontend field names
-      dob: u.dob || null,
-      created_at: u.createdAt,
+      dob: uz.dob || null,
+      created_at: uz.createdAt,
 
-      profile_photo_url: u.image || null,
+      profile_photo_url: uz.image || null,
 
       // Join zone names into comma string
-      zone_names: u.zones
+      zone_names: uz.zones
         .map((uz) => uz.zone.name)
         .join(","),
 
@@ -237,18 +237,55 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
 
 export const getUserExpenseTotals = async (req: AuthRequest, res: Response) => {
   try {
-    const totals = await prisma.expense.groupBy({
+    const page = Number(req.query.page) || 1
+    const pageSize = Number(req.query.pageSize) || 5
+    const search = (req.query.search as string) || ""
+
+    const skip = (page - 1) * pageSize
+
+    const grouped = await prisma.expense.groupBy({
       by: ["userId"],
       _sum: {
         amount: true
       }
     })
 
-    res.json(totals)
+    // Join user details manually
+    const results = await Promise.all(
+      grouped.map(async (g) => {
+        const user = await prisma.user.findUnique({
+          where: { id: g.userId },
+          select: { name: true, email: true }
+        })
+
+        return {
+          userId: g.userId,
+          userName: user?.name || user?.email || "Unknown",
+          totalAmount: g._sum.amount || 0
+        }
+      })
+    )
+
+    // Search filter
+    const filtered = results.filter(r =>
+      r.userName.toLowerCase().includes(search.toLowerCase())
+    )
+
+    const totalPages = Math.ceil(filtered.length / pageSize)
+
+    const paginated = filtered.slice(skip, skip + pageSize)
+
+    res.json({
+      data: paginated,
+      totalPages
+    })
+
   } catch (error) {
+    console.error("USER REPORT ERROR:", error)
     res.status(500).json({ message: "Failed to fetch user totals" })
   }
 }
+
 export const getCategoryExpenseTotals = async (req: AuthRequest, res: Response) => {
   try {
     const totals = await prisma.expense.groupBy({
