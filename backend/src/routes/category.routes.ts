@@ -3,8 +3,7 @@ import {
   createCategory,
   getAllCategories,
   updateCategory,
-  deleteCategory,
-  getCategories
+  deleteCategory
 } from "../controller/category.controller"
 import { authMiddleware } from "../middleware/auth.middleware"
 import { requireAdmin } from "../middleware/role.middleware"
@@ -13,7 +12,7 @@ import prisma from "../config/db"
 const router = Router()
 
 router.post("/", authMiddleware, createCategory , requireAdmin)
-router.get("/", authMiddleware, getCategories)
+router.get("/", authMiddleware, getAllCategories)
 router.put("/:id", authMiddleware, updateCategory)
 router.delete("/:id", authMiddleware, deleteCategory)
 router.get("/categories-summary", authMiddleware, requireAdmin, async (req, res) => {

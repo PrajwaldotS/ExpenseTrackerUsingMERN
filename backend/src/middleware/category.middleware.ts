@@ -9,8 +9,9 @@ export const getAllCategories = async (req: AuthRequest, res: Response) => {
     const categories = await prisma.category.findMany({
       include: {
         expenses: true,
-        creator: {   // make sure relation name matches your schema
+        creator: {   
           select: {
+            id:true,
             name: true
           }
         }

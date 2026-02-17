@@ -6,9 +6,8 @@ import {
   createUser,
   updateUser,
   getDashboardSummary,
-  makeMeAdmin,
   getUserExpenseTotals,
-  getCategoryExpenseTotals, 
+  getCategoryReport,
   getZoneExpenseTotals,
   getUserZones,
   toggleUserZone
@@ -36,7 +35,7 @@ router.put("/reset-password/:id",authMiddleware,requireAdmin,resetUserPassword)
 
 router.get("/users", authMiddleware, requireAdmin, getAllUsers)
 router.get( "/reports/users", authMiddleware, requireAdmin, getUserExpenseTotals)
-router.get("/reports/categories",authMiddleware, requireAdmin, getCategoryExpenseTotals)
+router.get("/reports/categories",authMiddleware, requireAdmin, getCategoryReport)
 router.get("/reports/zones", authMiddleware, requireAdmin, getZoneExpenseTotals)
 
 router.post( "/toggle-zone", authMiddleware,  requireAdmin,toggleUserZone)
