@@ -121,3 +121,70 @@ export const deleteZone = async (req: AuthRequest, res: Response) => {
   }
 }
 
+export const toggleUserZone = async (req: AuthRequest, res: Response) => {
+
+  try {
+    const { userId, zoneId } = req.body
+
+    if (!userId || !zoneId) {
+      return res.status(400).json({ message: "Missing userId or zoneId" })
+    }
+
+    const existing = await prisma.userZone.findUnique({
+      where: {
+        userId_zoneId: {
+          userId,
+          zoneId
+        }
+      }
+    })
+
+    if (existing) {
+      // Remove zone
+      await prisma.userZone.delete({
+        where: {
+          userId_zoneId: {
+            userId,
+            zoneId
+          }
+        }
+      })
+
+      return res.json({ message: "Zone removed from user" })
+    }
+
+    // Assign zone
+    await prisma.userZone.create({
+      data: {
+        userId,
+        zoneId
+      }
+    })
+
+    res.json({ message: "Zone assigned to user" })
+
+  } catch (error) {
+    console.error("TOGGLE USER ZONE ERROR:", error)
+    res.status(500).json({ message: "Failed to toggle zone" })
+  }
+}
+export const getUserZones = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.params.userId as string
+
+    const zones = await prisma.userZone.findMany({
+      where: { userId },
+      select: {
+        zoneId: true
+      }
+    })
+
+    const zoneIds = zones.map(z => z.zoneId)
+
+    res.json(zoneIds)
+
+  } catch (error) {
+    console.error("GET USER ZONES ERROR:", error)
+    res.status(500).json({ message: "Failed to fetch user zones" })
+  }
+}

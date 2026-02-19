@@ -10,3 +10,7 @@ cloudinary.config({
 })
 
 export default cloudinary
+
+
+
+//This is used to get the data from the cloudinary 
