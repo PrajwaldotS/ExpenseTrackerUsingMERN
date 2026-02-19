@@ -7,8 +7,7 @@ import { getDashboardSummary,getAllUsers , getCategoryReport,getUserReport , get
 
 const router = Router()
 
-router.get("/dashboard", authMiddleware, requireAdmin, getDashboardSummary)
-router.get("/users", authMiddleware, requireAdmin, getAllUsers)
+router.get("/dashboardReport", authMiddleware, requireAdmin, getDashboardSummary)
 router.get( "/reports/users", authMiddleware, requireAdmin, getUserReport)
 router.get("/reports/categories",authMiddleware, requireAdmin, getCategoryReport)
 router.get("/reports/zones", authMiddleware, requireAdmin, getZoneReport)

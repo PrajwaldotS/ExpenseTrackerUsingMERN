@@ -121,7 +121,7 @@ export const deleteZone = async (req: AuthRequest, res: Response) => {
   }
 }
 
-export const toggleUserZone = async (req: AuthRequest, res: Response) => {
+export const toogleUserZone = async (req: AuthRequest, res: Response) => {
 
   try {
     const { userId, zoneId } = req.body
